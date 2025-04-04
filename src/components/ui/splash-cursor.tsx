@@ -1,11 +1,11 @@
 "use client";
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 
 interface CustomMaterial {
-  vertexShader: any;
+  vertexShader: WebGLShader;
   fragmentShaderSource: string;
   programs: any[];
-  activeProgram: any;
+  activeProgram: WebGLProgram | null;
   uniforms: any[];
   setKeywords: (keywords: string[]) => void;
   bind: () => void;
@@ -13,7 +13,7 @@ interface CustomMaterial {
 
 interface CustomProgram {
   uniforms: any;
-  program: any;
+  program: WebGLProgram;
   bind: () => void;
 }
 
@@ -30,7 +30,7 @@ interface Pointer {
   color: { r: number, g: number, b: number };
 }
 
-function SplashCursor({
+export function SplashCursor({
   SIM_RESOLUTION = 128,
   DYE_RESOLUTION = 1440,
   CAPTURE_RESOLUTION = 512,
@@ -87,11 +87,7 @@ function SplashCursor({
 
     let pointers: Pointer[] = [pointerPrototype()];
 
-    const { gl, ext } = getWebGLContext(canvas);
-    if (!ext.supportLinearFiltering) {
-      config.DYE_RESOLUTION = 256;
-      config.SHADING = false;
-    }
+    type CombinedGLContext = WebGLRenderingContext & Partial<WebGL2RenderingContext>;
 
     function getWebGLContext(canvas: HTMLCanvasElement) {
       const params = {
@@ -101,27 +97,36 @@ function SplashCursor({
         antialias: false,
         preserveDrawingBuffer: false,
       };
-      let gl = canvas.getContext("webgl2", params) as WebGL2RenderingContext;
+      
+      let gl = canvas.getContext("webgl2", params) as CombinedGLContext | null;
       const isWebGL2 = !!gl;
-      if (!isWebGL2)
-        gl =
-          (canvas.getContext("webgl", params) ||
-          canvas.getContext("experimental-webgl", params)) as WebGLRenderingContext;
+      
+      if (!isWebGL2) {
+        gl = (canvas.getContext("webgl", params) ||
+          canvas.getContext("experimental-webgl", params)) as CombinedGLContext | null;
+      }
+      
+      if (!gl) {
+        throw new Error("WebGL not supported");
+      }
+
       let halfFloat;
       let supportLinearFiltering;
+      
       if (isWebGL2) {
         gl.getExtension("EXT_color_buffer_float");
         supportLinearFiltering = gl.getExtension("OES_texture_float_linear");
       } else {
         halfFloat = gl.getExtension("OES_texture_half_float");
-        supportLinearFiltering = gl.getExtension(
-          "OES_texture_half_float_linear"
-        );
+        supportLinearFiltering = gl.getExtension("OES_texture_half_float_linear");
       }
+      
       gl.clearColor(0.0, 0.0, 0.0, 1.0);
+      
       const halfFloatTexType = isWebGL2
-        ? gl.HALF_FLOAT
+        ? (gl as WebGL2RenderingContext).HALF_FLOAT
         : halfFloat && halfFloat.HALF_FLOAT_OES;
+      
       let formatRGBA;
       let formatRG;
       let formatR;
@@ -129,12 +134,22 @@ function SplashCursor({
       if (isWebGL2) {
         formatRGBA = getSupportedFormat(
           gl,
-          gl.RGBA16F,
+          (gl as WebGL2RenderingContext).RGBA16F,
           gl.RGBA,
           halfFloatTexType
         );
-        formatRG = getSupportedFormat(gl, gl.RG16F, gl.RG, halfFloatTexType);
-        formatR = getSupportedFormat(gl, gl.R16F, gl.RED, halfFloatTexType);
+        formatRG = getSupportedFormat(
+          gl,
+          (gl as WebGL2RenderingContext).RG16F,
+          (gl as WebGL2RenderingContext).RG,
+          halfFloatTexType
+        );
+        formatR = getSupportedFormat(
+          gl,
+          (gl as WebGL2RenderingContext).R16F,
+          (gl as WebGL2RenderingContext).RED,
+          halfFloatTexType
+        );
       } else {
         formatRGBA = getSupportedFormat(gl, gl.RGBA, gl.RGBA, halfFloatTexType);
         formatRG = getSupportedFormat(gl, gl.RGBA, gl.RGBA, halfFloatTexType);
@@ -153,62 +168,55 @@ function SplashCursor({
       };
     }
 
-    function getSupportedFormat(gl: WebGLRenderingContext | WebGL2RenderingContext, internalFormat: number, format: number, type: number) {
+    function getSupportedFormat(gl: CombinedGLContext, internalFormat: number, format: number, type: number | undefined) {
       if (!supportRenderTextureFormat(gl, internalFormat, format, type)) {
         switch (internalFormat) {
-          case (gl as WebGL2RenderingContext).R16F:
-            return getSupportedFormat(gl, (gl as WebGL2RenderingContext).RG16F, (gl as WebGL2RenderingContext).RG, type);
-          case (gl as WebGL2RenderingContext).RG16F:
-            return getSupportedFormat(gl, (gl as WebGL2RenderingContext).RGBA16F, gl.RGBA, type);
+          case (gl as WebGL2RenderingContext)?.R16F:
+            return getSupportedFormat(gl, (gl as WebGL2RenderingContext)?.RG16F, (gl as WebGL2RenderingContext)?.RG, type);
+          case (gl as WebGL2RenderingContext)?.RG16F:
+            return getSupportedFormat(gl, (gl as WebGL2RenderingContext)?.RGBA16F, gl.RGBA, type);
           default:
             return null;
         }
       }
+      
       return {
         internalFormat,
         format,
       };
     }
 
-    function supportRenderTextureFormat(gl: WebGLRenderingContext | WebGL2RenderingContext, internalFormat: number, format: number, type: number) {
-      const texture = gl.createTexture()!;
+    function supportRenderTextureFormat(gl: CombinedGLContext, internalFormat: number, format: number, type: number | undefined) {
+      if (!type) return false;
+      
+      const texture = gl.createTexture();
+      if (!texture) return false;
+      
       gl.bindTexture(gl.TEXTURE_2D, texture);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      gl.texImage2D(
-        gl.TEXTURE_2D,
-        0,
-        internalFormat,
-        4,
-        4,
-        0,
-        format,
-        type,
-        null
-      );
-      const fbo = gl.createFramebuffer()!;
+      gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat, 4, 4, 0, format, type, null);
+
+      const fbo = gl.createFramebuffer();
+      if (!fbo) return false;
+      
       gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-      gl.framebufferTexture2D(
-        gl.FRAMEBUFFER,
-        gl.COLOR_ATTACHMENT0,
-        gl.TEXTURE_2D,
-        texture,
-        0
-      );
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+      
       const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
       return status === gl.FRAMEBUFFER_COMPLETE;
     }
 
     class Material implements CustomMaterial {
-      vertexShader: any;
+      vertexShader: WebGLShader;
       fragmentShaderSource: string;
       programs: any[] = [];
-      activeProgram: any = null;
+      activeProgram: WebGLProgram | null = null;
       uniforms: any[] = [];
 
-      constructor(vertexShader: any, fragmentShaderSource: string) {
+      constructor(vertexShader: WebGLShader, fragmentShaderSource: string) {
         this.vertexShader = vertexShader;
         this.fragmentShaderSource = fragmentShaderSource;
       }
@@ -238,10 +246,14 @@ function SplashCursor({
 
     class Program implements CustomProgram {
       uniforms: any = {};
-      program: any;
+      program: WebGLProgram;
       
-      constructor(vertexShader: any, fragmentShader: any) {
-        this.program = createProgram(vertexShader, fragmentShader);
+      constructor(vertexShader: WebGLShader, fragmentShader: WebGLShader) {
+        const program = createProgram(vertexShader, fragmentShader);
+        if (!program) {
+          throw new Error("Failed to create program");
+        }
+        this.program = program;
         this.uniforms = getUniforms(this.program);
       }
       
@@ -250,33 +262,49 @@ function SplashCursor({
       }
     }
 
-    function createProgram(vertexShader: any, fragmentShader: any) {
-      let program = gl.createProgram()!;
+    function createProgram(vertexShader: WebGLShader, fragmentShader: WebGLShader): WebGLProgram | null {
+      const program = gl.createProgram();
+      if (!program) return null;
+      
       gl.attachShader(program, vertexShader);
       gl.attachShader(program, fragmentShader);
       gl.linkProgram(program);
-      if (!gl.getProgramParameter(program, gl.LINK_STATUS))
+      
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
         console.trace(gl.getProgramInfoLog(program));
+        return null;
+      }
+      
       return program;
     }
 
-    function getUniforms(program: any) {
-      let uniforms: any = [];
-      let uniformCount = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS);
+    function getUniforms(program: WebGLProgram) {
+      let uniforms: any = {};
+      const uniformCount = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS);
       for (let i = 0; i < uniformCount; i++) {
-        let uniformName = gl.getActiveUniform(program, i)!.name;
-        uniforms[uniformName] = gl.getUniformLocation(program, uniformName);
+        const uniformInfo = gl.getActiveUniform(program, i);
+        if (uniformInfo) {
+          const uniformName = uniformInfo.name;
+          uniforms[uniformName] = gl.getUniformLocation(program, uniformName);
+        }
       }
       return uniforms;
     }
 
-    function compileShader(type: number, source: string, keywords?: string[]) {
+    function compileShader(type: number, source: string, keywords?: string[]): WebGLShader {
       source = addKeywords(source, keywords || []);
-      const shader = gl.createShader(type)!;
+      const shader = gl.createShader(type);
+      if (!shader) {
+        throw new Error("Failed to create shader");
+      }
+      
       gl.shaderSource(shader, source);
       gl.compileShader(shader);
-      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
+      
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
         console.trace(gl.getShaderInfoLog(shader));
+      }
+      
       return shader;
     }
 
@@ -1274,7 +1302,6 @@ function SplashCursor({
     });
 
     updateFrame();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     SIM_RESOLUTION,
     DYE_RESOLUTION,
@@ -1298,5 +1325,3 @@ function SplashCursor({
     </div>
   );
 }
-
-export { SplashCursor };
