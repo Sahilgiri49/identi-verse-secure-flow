@@ -1,3 +1,4 @@
+
 "use client";
 import React, { useEffect, useRef } from "react";
 
@@ -52,6 +53,10 @@ export function SplashCursor({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    // Create a variable to store the WebGL context
+    let gl: WebGLRenderingContext | WebGL2RenderingContext;
+    let ext: any = {};
+
     function pointerPrototype(): Pointer {
       return {
         id: -1,
@@ -87,8 +92,7 @@ export function SplashCursor({
 
     let pointers: Pointer[] = [pointerPrototype()];
 
-    type CombinedGLContext = WebGLRenderingContext & Partial<WebGL2RenderingContext>;
-
+    // Get WebGL context and store it in the gl variable
     function getWebGLContext(canvas: HTMLCanvasElement) {
       const params = {
         alpha: true,
@@ -98,17 +102,20 @@ export function SplashCursor({
         preserveDrawingBuffer: false,
       };
       
-      let gl = canvas.getContext("webgl2", params) as CombinedGLContext | null;
-      const isWebGL2 = !!gl;
+      let context = canvas.getContext("webgl2", params) as WebGL2RenderingContext | null;
+      const isWebGL2 = !!context;
       
       if (!isWebGL2) {
-        gl = (canvas.getContext("webgl", params) ||
-          canvas.getContext("experimental-webgl", params)) as CombinedGLContext | null;
+        context = (canvas.getContext("webgl", params) ||
+          canvas.getContext("experimental-webgl", params)) as WebGLRenderingContext | null;
       }
       
-      if (!gl) {
+      if (!context) {
         throw new Error("WebGL not supported");
       }
+
+      // Assign to the global gl variable
+      gl = context;
 
       let halfFloat;
       let supportLinearFiltering;
@@ -156,19 +163,22 @@ export function SplashCursor({
         formatR = getSupportedFormat(gl, gl.RGBA, gl.RGBA, halfFloatTexType);
       }
 
+      // Assign to the global ext variable
+      ext = {
+        formatRGBA,
+        formatRG,
+        formatR,
+        halfFloatTexType,
+        supportLinearFiltering,
+      };
+
       return {
         gl,
-        ext: {
-          formatRGBA,
-          formatRG,
-          formatR,
-          halfFloatTexType,
-          supportLinearFiltering,
-        },
+        ext: ext
       };
     }
 
-    function getSupportedFormat(gl: CombinedGLContext, internalFormat: number, format: number, type: number | undefined) {
+    function getSupportedFormat(gl: WebGLRenderingContext | WebGL2RenderingContext, internalFormat: number, format: number, type: number | undefined) {
       if (!supportRenderTextureFormat(gl, internalFormat, format, type)) {
         switch (internalFormat) {
           case (gl as WebGL2RenderingContext)?.R16F:
@@ -186,7 +196,7 @@ export function SplashCursor({
       };
     }
 
-    function supportRenderTextureFormat(gl: CombinedGLContext, internalFormat: number, format: number, type: number | undefined) {
+    function supportRenderTextureFormat(gl: WebGLRenderingContext | WebGL2RenderingContext, internalFormat: number, format: number, type: number | undefined) {
       if (!type) return false;
       
       const texture = gl.createTexture();
@@ -316,6 +326,11 @@ export function SplashCursor({
       });
       return keywordsString + source;
     }
+
+    // Initialize WebGL context before using it
+    const { gl: glContext, ext: extContext } = getWebGLContext(canvas);
+    gl = glContext;
+    ext = extContext;
 
     const baseVertexShader = compileShader(
       gl.VERTEX_SHADER,
