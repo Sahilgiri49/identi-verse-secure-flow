@@ -1,13 +1,14 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/context/AuthContext';
 
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -20,6 +21,11 @@ const Header: React.FC = () => {
   const navigateTo = (path: string) => {
     navigate(path);
     closeMenu();
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigateTo('/');
   };
 
   return (
@@ -60,6 +66,33 @@ const Header: React.FC = () => {
             >
               Verify Identity
             </Button>
+            {user ? (
+              <Button 
+                onClick={handleLogout}
+                variant="ghost"
+                className="text-foreground/80 hover:text-primary hover:bg-primary/10 transition-colors"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Logout
+              </Button>
+            ) : (
+              <div className="flex items-center space-x-4">
+                <Button 
+                  onClick={() => navigateTo('/login')} 
+                  variant="ghost"
+                  className="text-foreground/80 hover:text-primary hover:bg-primary/10 transition-colors"
+                >
+                  Login
+                </Button>
+                <Button 
+                  onClick={() => navigateTo('/signup')} 
+                  variant="outline"
+                  className="border-primary text-primary hover:bg-primary/10 hover:text-primary transition-colors"
+                >
+                  Sign Up
+                </Button>
+              </div>
+            )}
           </nav>
 
           {/* Mobile Menu Button */}
@@ -106,6 +139,33 @@ const Header: React.FC = () => {
           >
             Verify Identity
           </Button>
+          {user ? (
+            <Button 
+              onClick={handleLogout}
+              variant="ghost"
+              className="text-foreground/80 hover:text-primary hover:bg-primary/10 transition-colors text-xl"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Logout
+            </Button>
+          ) : (
+            <div className="flex flex-col items-center space-y-4 mt-4">
+              <Button 
+                onClick={() => navigateTo('/login')} 
+                variant="ghost"
+                className="text-foreground/80 hover:text-primary hover:bg-primary/10 transition-colors text-xl"
+              >
+                Login
+              </Button>
+              <Button 
+                onClick={() => navigateTo('/signup')} 
+                variant="outline"
+                className="border-primary text-primary hover:bg-primary/10 hover:text-primary transition-colors text-xl"
+              >
+                Sign Up
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </header>
