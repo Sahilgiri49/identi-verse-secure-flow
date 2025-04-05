@@ -1,8 +1,7 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
-import IdentityScene from '@/components/IdentityScene';
+import IdentityAnimation from '@/components/IdentityAnimation';
 import BiometricCard from '@/components/BiometricCard';
 import BlockchainVerificationCard from '@/components/BlockchainVerificationCard';
 import { Button } from '@/components/ui/button';
@@ -40,7 +39,7 @@ const VerifyPage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div className="h-[60vh] lg:h-[80vh] flex items-center justify-center">
             <div className="w-full h-full">
-              <IdentityScene 
+              <IdentityAnimation 
                 isVerifying={step === 'biometric' || step === 'blockchain'} 
                 isComplete={step === 'complete'} 
               />

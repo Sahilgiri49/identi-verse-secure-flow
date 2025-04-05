@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
-import IdentityScene from '@/components/IdentityScene';
+import IdentityAnimation from '@/components/IdentityAnimation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Shield, Database, Lock, Globe } from 'lucide-react';
@@ -41,7 +41,7 @@ const Index: React.FC = () => {
               </div>
             </div>
             <div className="order-1 lg:order-2 h-[60vh]">
-              <IdentityScene />
+              <IdentityAnimation />
             </div>
           </div>
         </div>

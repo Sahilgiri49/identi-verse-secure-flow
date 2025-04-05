@@ -1,4 +1,3 @@
-
 "use client";
 import React, { useEffect, useRef } from "react";
 
@@ -32,13 +31,13 @@ interface Pointer {
 }
 
 export function SplashCursor({
-  SIM_RESOLUTION = 128,
-  DYE_RESOLUTION = 1440,
-  CAPTURE_RESOLUTION = 512,
+  SIM_RESOLUTION = 64,
+  DYE_RESOLUTION = 720,
+  CAPTURE_RESOLUTION = 256,
   DENSITY_DISSIPATION = 3.5,
   VELOCITY_DISSIPATION = 2,
   PRESSURE = 0.1,
-  PRESSURE_ITERATIONS = 20,
+  PRESSURE_ITERATIONS = 10,
   CURL = 3,
   SPLAT_RADIUS = 0.2,
   SPLAT_FORCE = 6000,
@@ -48,6 +47,8 @@ export function SplashCursor({
   TRANSPARENT = true,
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rafRef = useRef<number>();
+  const lastTimeRef = useRef<number>(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -874,21 +875,18 @@ export function SplashCursor({
     let colorUpdateTimer = 0.0;
 
     function updateFrame() {
-      const dt = calcDeltaTime();
+      const now = performance.now();
+      const dt = Math.min((now - lastTimeRef.current) / 1000, 0.016666);
+      lastTimeRef.current = now;
+
       if (resizeCanvas()) initFramebuffers();
       updateColors(dt);
       applyInputs();
       step(dt);
       render(null);
-      requestAnimationFrame(updateFrame);
-    }
 
-    function calcDeltaTime() {
-      let now = Date.now();
-      let dt = (now - lastUpdateTime) / 1000;
-      dt = Math.min(dt, 0.016666);
-      lastUpdateTime = now;
-      return dt;
+      // Use requestAnimationFrame with a timestamp
+      rafRef.current = requestAnimationFrame(updateFrame);
     }
 
     function resizeCanvas() {
@@ -1317,6 +1315,13 @@ export function SplashCursor({
     });
 
     updateFrame();
+
+    // Cleanup
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
   }, [
     SIM_RESOLUTION,
     DYE_RESOLUTION,
@@ -1335,8 +1340,30 @@ export function SplashCursor({
   ]);
 
   return (
-    <div className="fixed top-0 left-0 z-0 pointer-events-none w-full h-full">
-      <canvas ref={canvasRef} id="fluid" className="w-full h-full" />
+    <div 
+      className="fixed top-0 left-0 w-full h-full pointer-events-none"
+      style={{ 
+        zIndex: -1,
+        position: 'fixed',
+        inset: 0,
+        background: 'transparent'
+      }}
+    >
+      <canvas 
+        ref={canvasRef} 
+        id="fluid" 
+        className="w-full h-full"
+        style={{ 
+          willChange: 'transform',
+          transform: 'translateZ(0)',
+          backfaceVisibility: 'hidden',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%'
+        }}
+      />
     </div>
   );
 }
