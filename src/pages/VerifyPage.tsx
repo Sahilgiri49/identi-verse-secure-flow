@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import IdentityAnimation from '@/components/IdentityAnimation';
 import BiometricCard from '@/components/BiometricCard';
+import FacialVerificationCard from '@/components/FacialVerificationCard';
+import PasswordVerificationCard from '@/components/PasswordVerificationCard';
 import BlockchainVerificationCard from '@/components/BlockchainVerificationCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,17 +13,20 @@ import { CheckCircle, ChevronRight } from 'lucide-react';
 
 const VerifyPage: React.FC = () => {
   const navigate = useNavigate();
-  const [step, setStep] = useState<'initial' | 'biometric' | 'blockchain' | 'complete'>('initial');
+  const [step, setStep] = useState<'initial' | 'verification' | 'blockchain' | 'complete'>('initial');
+  const [verificationType, setVerificationType] = useState<'biometric' | 'facial' | 'password'>('biometric');
+  const [verificationComplete, setVerificationComplete] = useState(false);
   
   const startVerification = () => {
-    setStep('biometric');
+    setStep('verification');
     toast({
       title: "Starting Verification",
-      description: "Beginning the secure identity verification process...",
+      description: "Choose your preferred verification method...",
     });
   };
   
-  const handleBiometricComplete = () => {
+  const handleVerificationComplete = () => {
+    setVerificationComplete(true);
     setStep('blockchain');
   };
   
@@ -33,6 +38,17 @@ const VerifyPage: React.FC = () => {
     navigate('/services');
   };
 
+  const renderVerificationCard = () => {
+    switch (verificationType) {
+      case 'biometric':
+        return <BiometricCard onComplete={handleVerificationComplete} />;
+      case 'facial':
+        return <FacialVerificationCard onComplete={handleVerificationComplete} />;
+      case 'password':
+        return <PasswordVerificationCard onComplete={handleVerificationComplete} />;
+    }
+  };
+
   return (
     <Layout>
       <div className="container mx-auto px-4 py-12 min-h-screen">
@@ -40,7 +56,7 @@ const VerifyPage: React.FC = () => {
           <div className="h-[60vh] lg:h-[80vh] flex items-center justify-center">
             <div className="w-full h-full">
               <IdentityAnimation 
-                isVerifying={step === 'biometric' || step === 'blockchain'} 
+                isVerifying={step === 'verification' || step === 'blockchain'} 
                 isComplete={step === 'complete'} 
               />
             </div>
@@ -56,7 +72,7 @@ const VerifyPage: React.FC = () => {
             <p className="text-lg text-foreground/80 mb-8 text-center lg:text-left">
               {step === 'complete' 
                 ? "Your identity has been securely verified and cryptographically stored on our blockchain network. You can now access secure services." 
-                : "Our advanced platform uses blockchain technology and biometric verification to securely authenticate your identity without exposing your personal data."}
+                : "Our advanced platform uses blockchain technology and multiple verification methods to securely authenticate your identity without exposing your personal data."}
             </p>
             
             {step === 'initial' && (
@@ -69,8 +85,33 @@ const VerifyPage: React.FC = () => {
               </Button>
             )}
             
-            {step === 'biometric' && (
-              <BiometricCard onComplete={handleBiometricComplete} />
+            {step === 'verification' && !verificationComplete && (
+              <div className="space-y-6 w-full max-w-sm">
+                <div className="flex justify-center space-x-4 mb-6">
+                  <Button
+                    variant={verificationType === 'biometric' ? 'default' : 'outline'}
+                    onClick={() => setVerificationType('biometric')}
+                    className="flex-1"
+                  >
+                    Fingerprint
+                  </Button>
+                  <Button
+                    variant={verificationType === 'facial' ? 'default' : 'outline'}
+                    onClick={() => setVerificationType('facial')}
+                    className="flex-1"
+                  >
+                    Facial
+                  </Button>
+                  <Button
+                    variant={verificationType === 'password' ? 'default' : 'outline'}
+                    onClick={() => setVerificationType('password')}
+                    className="flex-1"
+                  >
+                    Password
+                  </Button>
+                </div>
+                {renderVerificationCard()}
+              </div>
             )}
             
             {step === 'blockchain' && (

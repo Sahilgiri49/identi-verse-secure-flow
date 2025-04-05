@@ -30,6 +30,28 @@ interface Pointer {
   color: { r: number, g: number, b: number };
 }
 
+interface Material {
+  vertexShader: WebGLShader;
+  fragmentShaderSource: string;
+  programs: any[];
+  activeProgram: WebGLProgram | null;
+  uniforms: {
+    texelSize?: WebGLUniformLocation;
+    uTexture?: WebGLUniformLocation;
+    [key: string]: WebGLUniformLocation | undefined;
+  };
+  setKeywords: (keywords: string[]) => void;
+  bind: () => void;
+}
+
+interface WebGLExtensions {
+  formatRGBA: any;
+  formatRG: any;
+  formatR: any;
+  halfFloatTexType: any;
+  supportLinearFiltering: any;
+}
+
 export function SplashCursor({
   SIM_RESOLUTION = 64,
   DYE_RESOLUTION = 720,
@@ -56,7 +78,7 @@ export function SplashCursor({
 
     // Create a variable to store the WebGL context
     let gl: WebGLRenderingContext | WebGL2RenderingContext;
-    let ext: any = {};
+    let ext: WebGLExtensions;
 
     function pointerPrototype(): Pointer {
       return {
@@ -115,24 +137,21 @@ export function SplashCursor({
         throw new Error("WebGL not supported");
       }
 
-      // Assign to the global gl variable
-      gl = context;
-
       let halfFloat;
       let supportLinearFiltering;
       
       if (isWebGL2) {
-        gl.getExtension("EXT_color_buffer_float");
-        supportLinearFiltering = gl.getExtension("OES_texture_float_linear");
+        context.getExtension("EXT_color_buffer_float");
+        supportLinearFiltering = context.getExtension("OES_texture_float_linear");
       } else {
-        halfFloat = gl.getExtension("OES_texture_half_float");
-        supportLinearFiltering = gl.getExtension("OES_texture_half_float_linear");
+        halfFloat = context.getExtension("OES_texture_half_float");
+        supportLinearFiltering = context.getExtension("OES_texture_half_float_linear");
       }
       
-      gl.clearColor(0.0, 0.0, 0.0, 1.0);
+      context.clearColor(0.0, 0.0, 0.0, 1.0);
       
       const halfFloatTexType = isWebGL2
-        ? (gl as WebGL2RenderingContext).HALF_FLOAT
+        ? (context as WebGL2RenderingContext).HALF_FLOAT
         : halfFloat && halfFloat.HALF_FLOAT_OES;
       
       let formatRGBA;
@@ -140,32 +159,33 @@ export function SplashCursor({
       let formatR;
 
       if (isWebGL2) {
+        const webgl2Context = context as WebGL2RenderingContext;
         formatRGBA = getSupportedFormat(
-          gl,
-          (gl as WebGL2RenderingContext).RGBA16F,
-          gl.RGBA,
+          webgl2Context,
+          webgl2Context.RGBA16F,
+          webgl2Context.RGBA,
           halfFloatTexType
         );
         formatRG = getSupportedFormat(
-          gl,
-          (gl as WebGL2RenderingContext).RG16F,
-          (gl as WebGL2RenderingContext).RG,
+          webgl2Context,
+          webgl2Context.RG16F,
+          webgl2Context.RG,
           halfFloatTexType
         );
         formatR = getSupportedFormat(
-          gl,
-          (gl as WebGL2RenderingContext).R16F,
-          (gl as WebGL2RenderingContext).RED,
+          webgl2Context,
+          webgl2Context.R16F,
+          webgl2Context.RED,
           halfFloatTexType
         );
       } else {
-        formatRGBA = getSupportedFormat(gl, gl.RGBA, gl.RGBA, halfFloatTexType);
-        formatRG = getSupportedFormat(gl, gl.RGBA, gl.RGBA, halfFloatTexType);
-        formatR = getSupportedFormat(gl, gl.RGBA, gl.RGBA, halfFloatTexType);
+        const webglContext = context as WebGLRenderingContext;
+        formatRGBA = getSupportedFormat(webglContext, webglContext.RGBA, webglContext.RGBA, halfFloatTexType);
+        formatRG = getSupportedFormat(webglContext, webglContext.RGBA, webglContext.RGBA, halfFloatTexType);
+        formatR = getSupportedFormat(webglContext, webglContext.RGBA, webglContext.RGBA, halfFloatTexType);
       }
 
-      // Assign to the global ext variable
-      ext = {
+      const ext: WebGLExtensions = {
         formatRGBA,
         formatRG,
         formatR,
@@ -174,8 +194,9 @@ export function SplashCursor({
       };
 
       return {
-        gl,
-        ext: ext
+        gl: context,
+        ext,
+        isWebGL2
       };
     }
 
@@ -220,12 +241,16 @@ export function SplashCursor({
       return status === gl.FRAMEBUFFER_COMPLETE;
     }
 
-    class Material implements CustomMaterial {
+    class Material implements Material {
       vertexShader: WebGLShader;
       fragmentShaderSource: string;
       programs: any[] = [];
       activeProgram: WebGLProgram | null = null;
-      uniforms: any[] = [];
+      uniforms: {
+        texelSize?: WebGLUniformLocation;
+        uTexture?: WebGLUniformLocation;
+        [key: string]: WebGLUniformLocation | undefined;
+      } = {};
 
       constructor(vertexShader: WebGLShader, fragmentShaderSource: string) {
         this.vertexShader = vertexShader;
@@ -329,7 +354,7 @@ export function SplashCursor({
     }
 
     // Initialize WebGL context before using it
-    const { gl: glContext, ext: extContext } = getWebGLContext(canvas);
+    const { gl: glContext, ext: extContext, isWebGL2 } = getWebGLContext(canvas);
     gl = glContext;
     ext = extContext;
 
@@ -1056,13 +1081,16 @@ export function SplashCursor({
       let width = target == null ? gl.drawingBufferWidth : target.width;
       let height = target == null ? gl.drawingBufferHeight : target.height;
       displayMaterial.bind();
-      if (config.SHADING)
+      if (config.SHADING && displayMaterial.uniforms.texelSize) {
         gl.uniform2f(
           displayMaterial.uniforms.texelSize,
           1.0 / width,
           1.0 / height
         );
-      gl.uniform1i(displayMaterial.uniforms.uTexture, dye.read.attach(0));
+      }
+      if (displayMaterial.uniforms.uTexture) {
+        gl.uniform1i(displayMaterial.uniforms.uTexture, dye.read.attach(0));
+      }
       blit(target);
     }
 

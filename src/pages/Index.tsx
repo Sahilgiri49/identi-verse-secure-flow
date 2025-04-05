@@ -1,13 +1,34 @@
-import React from 'react';
+import React, { lazy, Suspense, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
-import IdentityAnimation from '@/components/IdentityAnimation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Shield, Database, Lock, Globe } from 'lucide-react';
 
+// Lazy load the IdentityAnimation component
+const IdentityAnimation = lazy(() => import('@/components/IdentityAnimation'));
+
+// Memoize the service icons to prevent unnecessary re-renders
+const ServiceIcons = React.memo(({ services }: { services: string[] }) => (
+  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8 max-w-5xl mx-auto">
+    {services.map((service, index) => (
+      <div key={index} className="flex flex-col items-center">
+        <div className="w-20 h-20 bg-muted/50 rounded-lg flex items-center justify-center mb-3 hover-glow transition-all duration-300">
+          <span className="text-primary font-bold">{service.charAt(0)}</span>
+        </div>
+        <span className="text-foreground/80 text-sm">{service}</span>
+      </div>
+    ))}
+  </div>
+));
+
+ServiceIcons.displayName = 'ServiceIcons';
+
 const Index: React.FC = () => {
   const navigate = useNavigate();
+
+  // Memoize the services array
+  const services = useMemo(() => ['Banking', 'Healthcare', 'E-Commerce', 'Government', 'Travel', 'Education'], []);
 
   return (
     <Layout>
@@ -41,7 +62,9 @@ const Index: React.FC = () => {
               </div>
             </div>
             <div className="order-1 lg:order-2 h-[60vh]">
-              <IdentityAnimation />
+              <Suspense fallback={<div className="w-full h-full bg-muted/20 animate-pulse rounded-lg" />}>
+                <IdentityAnimation />
+              </Suspense>
             </div>
           </div>
         </div>
@@ -158,17 +181,7 @@ const Index: React.FC = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8 max-w-5xl mx-auto">
-            {/* Service Icons */}
-            {['Banking', 'Healthcare', 'E-Commerce', 'Government', 'Travel', 'Education'].map((service, index) => (
-              <div key={index} className="flex flex-col items-center">
-                <div className="w-20 h-20 bg-muted/50 rounded-lg flex items-center justify-center mb-3 hover-glow transition-all duration-300">
-                  <span className="text-primary font-bold">{service.charAt(0)}</span>
-                </div>
-                <span className="text-foreground/80 text-sm">{service}</span>
-              </div>
-            ))}
-          </div>
+          <ServiceIcons services={services} />
         </div>
       </section>
 
@@ -194,4 +207,4 @@ const Index: React.FC = () => {
   );
 };
 
-export default Index;
+export default React.memo(Index);
