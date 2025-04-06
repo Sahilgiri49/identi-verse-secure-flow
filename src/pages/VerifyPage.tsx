@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
 import Layout from '@/components/Layout';
 import IdentityAnimation from '@/components/IdentityAnimation';
 import BiometricCard from '@/components/BiometricCard';
@@ -13,9 +14,17 @@ import { CheckCircle, ChevronRight } from 'lucide-react';
 
 const VerifyPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [step, setStep] = useState<'initial' | 'verification' | 'blockchain' | 'complete'>('initial');
   const [verificationType, setVerificationType] = useState<'biometric' | 'facial' | 'password'>('biometric');
   const [verificationComplete, setVerificationComplete] = useState(false);
+  
+  useEffect(() => {
+    // If user is not logged in, redirect to login page
+    if (!user) {
+      navigate('/login');
+    }
+  }, [user, navigate]);
   
   const startVerification = () => {
     setStep('verification');
@@ -28,6 +37,7 @@ const VerifyPage: React.FC = () => {
   const handleVerificationComplete = () => {
     setVerificationComplete(true);
     setStep('blockchain');
+    navigate('/services');
   };
   
   const handleBlockchainComplete = () => {
@@ -48,6 +58,11 @@ const VerifyPage: React.FC = () => {
         return <PasswordVerificationCard onComplete={handleVerificationComplete} />;
     }
   };
+
+  // If user is not logged in, don't render anything while redirecting
+  if (!user) {
+    return null;
+  }
 
   return (
     <Layout>

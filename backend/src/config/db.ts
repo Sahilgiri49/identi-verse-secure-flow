@@ -15,8 +15,13 @@ export const connectDB = async () => {
     console.log('Connection string:', MONGODB_URI.replace(/\/\/[^@]+@/, '//****:****@'));
     
     const options = {
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
+      connectTimeoutMS: 10000,
+      maxPoolSize: 10,
+      retryWrites: true,
+      retryReads: true,
+      family: 4,
     };
 
     await mongoose.connect(MONGODB_URI, options);
@@ -30,6 +35,6 @@ export const connectDB = async () => {
         console.error('Error code:', (error as any).code);
       }
     }
-    process.exit(1);
+    throw error;
   }
 }; 

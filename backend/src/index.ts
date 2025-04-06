@@ -35,11 +35,37 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Connect to MongoDB
-connectDB();
+// Connect to MongoDB with retry logic
+const connectWithRetry = async (retries = 5, delay = 5000) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      await connectDB();
+      return;
+    } catch (error) {
+      console.error(`MongoDB connection attempt ${i + 1} failed:`, error);
+      if (i < retries - 1) {
+        console.log(`Retrying in ${delay/1000} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      } else {
+        console.error('Max retries reached. Could not connect to MongoDB.');
+        throw error;
+      }
+    }
+  }
+};
 
 // Start server
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
-  console.log('CORS enabled for all origins');
-}); 
+const startServer = async () => {
+  try {
+    await connectWithRetry();
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server is running on http://localhost:${PORT}`);
+      console.log('CORS enabled for all origins');
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+startServer(); 
